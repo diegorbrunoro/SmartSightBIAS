@@ -197,3 +197,14 @@ def download_dados_farm(request):
         time.sleep(DELAY_ENTRE_REQUISICOES)
 
     return "Processamento concluído de forma inesperada.", 200
+
+if __name__ == "__main__":
+    import os
+    port = int(os.getenv("PORT", 8080))
+    logging.info(f"Iniciando o servidor na porta: {port}")
+    try:
+        functions_framework.run_http(download_dados_farm, host="0.0.0.0", port=port)
+        logging.info("Servidor iniciado com sucesso!")
+    except Exception as e:
+        logging.error(f"Erro ao iniciar o servidor: {str(e)}")
+        raise
