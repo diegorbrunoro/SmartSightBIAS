@@ -3,3 +3,4 @@ requests==2.*
 pandas==2.*
 pyarrow==14.*
 google-cloud-storage==2.*
+numpy==1.*
