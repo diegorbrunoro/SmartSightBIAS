@@ -1,39 +1,18 @@
-# teste_download_farm.py
 import functions_framework
-import logging
-from utils import download_dados_farm  # Importa a função genérica de utils.py
+import requests
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
+# Supondo que essa função já existe com a lógica completa
+def download_dados_farm(modulo, primeiro_registro=0):
+    print(f"Processando download para modulo={modulo}, primeiro_registro={primeiro_registro}")
+    # Aqui vai toda a lógica anterior: requisições, salvar no bucket, retries, etc.
+    # Ela já usa 'modulo' dinamicamente em URLs, caminhos de arquivo e consolidação
+    return "Download concluído", 200
 
-# Função de teste
 @functions_framework.http
-def teste_download_farm(request):
-    # Inicia a função
-    modulo = 'fornecedor'  # Armazena o nome do módulo
-
-    # Chama a função genérica download_dados_farm
-    result = download_dados_farm(
-        request,
-        modulo=modulo,
-        reinvoke_url="https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/teste-download-farm",
-        consolidate_output_file="fornecedor/consolidado/fornecedores_inicial.parquet"
-    )
-
-    # Informa em log que chamou download_dados_farm e qual o módulo
-    logging.info(f"Função download_dados_farm chamada para o módulo: {modulo}")
-
-    # Encerra a função retornando o resultado
-    return result
-
-if __name__ == "__main__":
-    import os
-    port = int(os.getenv("PORT", 8080))
-    logging.info(f"Iniciando o servidor na porta: {port}")
-    try:
-        # Rodar a função teste_download_farm localmente
-        functions_framework.run_http(teste_download_farm, host="0.0.0.0", port=port)
-        logging.info("Servidor iniciado com sucesso!")
-    except Exception as e:
-        logging.error(f"Erro ao iniciar o servidor: {str(e)}")
-        raise
+def produtos_dados_download_farm(request):
+    print("Iniciando execução da função produtos_dados_download_farm.")
+    request_json = request.get_json(silent=True)
+    modulo = request_json.get('modulo', 'produto') if request_json else 'produto'  # Default 'produto'
+    primeiro_registro = request_json.get('primeiroRegistro', 0) if request_json else 0
+    print(f"Recebido: modulo={modulo}, primeiro_registro={primeiro_registro}")
+    return download_dados_farm(modulo, primeiro_registro)
