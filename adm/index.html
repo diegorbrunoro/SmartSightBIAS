@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Download - Farmácia</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f4f9; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px; cursor: pointer; color: white; border: none; border-radius: 5px; transition: background-color 0.3s; }
+        .download-btn { background-color: #4CAF50; }
+        .download-btn:hover { background-color: #45a049; }
+        .check-status { background-color: #2196F3; }
+        .check-status:hover { background-color: #1976D2; }
+        #check-all-status { background-color: #FF9800; }
+        #check-all-status:hover { background-color: #F57C00; }
+        #clearStatus, #resetPrimeiroRegistro { background-color: #f44336; }
+        #clearStatus:hover, #resetPrimeiroRegistro:hover { background-color: #da190b; }
+        #status { margin-top: 20px; font-weight: bold; }
+        #status.error { color: red; background-color: #ffe6e6; padding: 10px; border-radius: 5px; }
+        #status.success { color: green; background-color: #e6ffe6; padding: 10px; border-radius: 5px; }
+        input[type="number"] { padding: 5px; margin: 10px; width: 100px; border: 1px solid #ccc; border-radius: 5px; }
+        h1, h2 { color: #333; }
+        #tentativas { color: red; font-size: 14px; margin-top: 10px; }
+        .module-buttons { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+        .module-buttons button { flex: 1 1 150px; }
+        #compras-btn { background-color: #4CAF50; }
+        #compras-btn:hover { background-color: #45a049; }
+        #vendas-btn { background-color: #FF5722; }
+        #vendas-btn:hover { background-color: #E64A19; }
+        #produtos-btn { background-color: #9C27B0; }
+        #produtos-btn:hover { background-color: #7B1FA2; }
+        #fornecedores-btn { background-color: #009688; }
+        #fornecedores-btn:hover { background-color: #00796B; }
+        #estoque-btn { background-color: #3F51B5; }
+        #estoque-btn:hover { background-color: #303F9F; }
+        #status-compras, #status-vendas, #status-produtos, #status-fornecedores, #status-estoque { margin-top: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1 id="titulo">Portal de Download - Farmácia</h1>
+    <div>
+        <label for="primeiroRegistro">Primeiro Registro:</label>
+        <input type="number" id="primeiroRegistro" value="0" min="0">
+        <button id="resetPrimeiroRegistro" onclick="resetPrimeiroRegistro()">Resetar Primeiro Registro</button>
+    </div>
+    <div class="module-buttons">
+        <button id="compras-btn" class="download-btn" onclick="dispararFuncao('compras')">Baixar Compras</button>
+        <button id="vendas-btn" class="download-btn" onclick="dispararFuncao('vendas')">Baixar Vendas</button>
+        <button id="produtos-btn" class="download-btn" onclick="dispararFuncao('produtos')">Baixar Produtos</button>
+        <button id="fornecedores-btn" class="download-btn" onclick="dispararFuncao('fornecedores')">Baixar Fornecedores</button>
+        <button id="estoque-btn" class="download-btn" onclick="dispararFuncao('estoque')">Baixar Estoque</button>
+    </div>
+    <button id="clearStatus" onclick="limparStatus()">Limpar Status</button>
+    <div>
+        <h2>Verificar Status</h2>
+        <div class="module-buttons">
+            <button class="check-status" onclick="checkStatus('compras')">Status Compras</button>
+            <button class="check-status" onclick="checkStatus('vendas')">Status Vendas</button>
+            <button class="check-status" onclick="checkStatus('produtos')">Status Produtos</button>
+            <button class="check-status" onclick="checkStatus('fornecedores')">Status Fornecedores</button>
+            <button class="check-status" onclick="checkStatus('estoque')">Status Estoque</button>
+        </div>
+        <button id="check-all-status" onclick="checkAllStatus()">Atualizar Todos os Status</button>
+    </div>
+    <div id="status"></div>
+    <div id="status-compras"></div>
+    <div id="status-vendas"></div>
+    <div id="status-produtos"></div>
+    <div id="status-fornecedores"></div>
+    <div id="status-estoque"></div>
+    <div id="tentativas">Tentativas de senha errada: 0</div>
+
+    <script>
+        const SENHA_CORRETA = "patrao123";
+        let tentativasErradas = 0;
+
+        function dispararFuncao(modulo) {
+            const senhaDigitada = prompt(`Digite a senha para disparar ${modulo}:`);
+            const status = document.getElementById('status');
+            const titulo = document.getElementById('titulo');
+            const tentativas = document.getElementById('tentativas');
+
+            if (senhaDigitada !== SENHA_CORRETA) {
+                tentativasErradas++;
+                status.innerText = "Senha incorreta! Tente novamente.";
+                status.className = "error";
+                tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
+                return;
+            }
+
+            tentativasErradas = 0;
+            tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
+
+            titulo.innerText = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
+
+            const primeiroRegistro = document.getElementById('primeiroRegistro').value;
+            const url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/tese-download-farm";
+            const payload = { "modulo": modulo, "primeiroRegistro": parseInt(primeiroRegistro) };
+
+            status.innerText = `Disparando ${modulo} a partir do registro ${primeiroRegistro}...`;
+            status.className = "success";
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.text())
+            .then(data => {
+                status.innerText = `${modulo} disparado com sucesso! Resposta: ${data}`;
+                status.className = "success";
+            })
+            .catch(error => {
+                status.innerText = `Erro ao disparar ${modulo}: ${error}`;
+                status.className = "error";
+            });
+        }
+
+        function checkStatus(modulo) {
+            const status = document.getElementById('status');
+            const statusModule = document.getElementById(`status-${modulo}`);
+            status.innerText = "Funcionalidade de status ainda não implementada.";
+            status.className = "error";
+            statusModule.innerText = `${modulo.charAt(0).toUpperCase() + modulo.slice(1)}: Não implementado`;
+            statusModule.className = "error";
+        }
+
+        function checkAllStatus() {
+            const modules = ['compras', 'vendas', 'produtos', 'fornecedores', 'estoque'];
+            modules.forEach(module => checkStatus(module));
+        }
+
+        function limparStatus() {
+            const status = document.getElementById('status');
+            const titulo = document.getElementById
