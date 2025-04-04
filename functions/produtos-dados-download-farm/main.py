@@ -8,7 +8,7 @@ import time
 from google.cloud import storage
 from datetime import datetime, timedelta
 
-# Token hardcoded
+# Token hardcoded (considere mover para variável de ambiente ou Secret Manager)
 TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJjb2RfZmlsaWFsIjoiMSIsInNjb3BlIjpbImRyb2dhcmlhIl0sInRva2VuX2ludGVncmFjYW8iOiJ0cnVlIiwiY29kX2Zhcm1hY2lhIjoiMjA4OTAiLCJleHAiOjQwNzA5MTk2MDAsImlhdCI6MTY5MDgyNTk2NiwianRpIjoiOThiZGY0OTUtNDUxNy00NGEzLTg1ODktMzNkYzI3NjJiMmE5IiwiY29kX3VzdWFyaW8iOiI5IiwiYXV0aG9yaXRpZXMiOlsiQVBJX0lOVEVHUkFDQU8iXX0.7CnITyJuUhAZbKO-uothoZkHWidKv9lvtlN_d-ZLJ7k'
 
 def make_request_with_retries(url, headers, max_retries=10, timeout=20, delay=60):
@@ -33,12 +33,12 @@ def produtos_dados_download_farm(request):
     request_json = request.get_json(silent=True)
     primeiro_registro = request_json.get('primeiroRegistro', 0) if request_json else 0
     qtd_registros = 999  # Máximo permitido pela API
-    modulo = 'produto'  # Correto pra produtos
+    modulo = 'produto'  # Módulo definido uma vez e reutilizado
     max_paginas = 1000
     delay_entre_requisicoes = 1
     max_iteracoes_por_execucao = 15
 
-    print(f"Parâmetros recebidos: primeiro_registro={primeiro_registro}, qtd_registros={qtd_registros}")
+    print(f"Parâmetros recebidos: primeiro_registro={primeiro_registro}, qtd_registros={qtd_registros}, modulo={modulo}")
 
     storage_client = storage.Client()
     bucket = storage_client.bucket("farmacia-data-bucket-001")
@@ -52,16 +52,29 @@ def produtos_dados_download_farm(request):
         if iteracao >= max_paginas:
             print(f"Limite máximo de {max_paginas} iterações atingido em {primeiro_registro}.")
             consolidate_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/consolidate-dados-farm"
-            requests.post(consolidate_url, json={
-                "module": "produto",
-                "output_file": "produto/consolidado/produtos_inicial.parquet"
-            })
+            output_file_path = f"{modulo}/consolidado/{modulo}_inicial.parquet"
+            try:
+                response = requests.post(consolidate_url, json={
+                    "module": modulo,
+                    "output_file": output_file_path
+                })
+                response.raise_for_status()
+                print(f"Consolidação solicitada com sucesso para {output_file_path}")
+            except requests.RequestException as e:
+                print(f"Erro ao chamar consolidação: {str(e)}")
+                return f"Erro na consolidação: {str(e)}", 500
             return f"Limite máximo de {max_paginas} iterações atingido.", 200
 
         if (iteracao - iteracao_inicial) >= max_iteracoes_por_execucao:
             print(f"Limite de {max_iteracoes_por_execucao} iterações por execução atingido. Reiniciando a partir de primeiro_registro={primeiro_registro}.")
             reinvoke_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/produtos-dados-download-farm"
-            requests.post(reinvoke_url, json={"primeiroRegistro": primeiro_registro})
+            try:
+                response = requests.post(reinvoke_url, json={"primeiroRegistro": primeiro_registro})
+                response.raise_for_status()
+                print(f"Reinvocação bem-sucedida para primeiro_registro={primeiro_registro}")
+            except requests.RequestException as e:
+                print(f"Erro ao reinvocar a função: {str(e)}")
+                return f"Erro ao reinvocar: {str(e)}", 500
             return f"Processamento pausado após {max_iteracoes_por_execucao} iterações. Reiniciando a partir de {primeiro_registro}.", 200
 
         blob_name = f"{modulo}/In_{iteracao_str}_{modulo}_pg_{primeiro_registro}_a_{primeiro_registro + qtd_registros - 1}.parquet"
@@ -85,10 +98,17 @@ def produtos_dados_download_farm(request):
         if not data:
             print(f"Nenhum dado retornado para iteração {iteracao_str} (página {primeiro_registro}). Processamento concluído.")
             consolidate_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/consolidate-dados-farm"
-            requests.post(consolidate_url, json={
-                "module": "produto",
-                "output_file": "produto/consolidado/produtos_inicial.parquet"
-            })
+            output_file_path = f"{modulo}/consolidado/{modulo}_inicial.parquet"
+            try:
+                response = requests.post(consolidate_url, json={
+                    "module": modulo,
+                    "output_file": output_file_path
+                })
+                response.raise_for_status()
+                print(f"Consolidação solicitada com sucesso para {output_file_path}")
+            except requests.RequestException as e:
+                print(f"Erro ao chamar consolidação: {str(e)}")
+                return f"Erro na consolidação: {str(e)}", 500
             return "Nenhum dado retornado. Processamento concluído.", 200
 
         num_registros_retornados = len(data)
@@ -115,10 +135,17 @@ def produtos_dados_download_farm(request):
         if num_registros_retornados < qtd_registros:
             print(f"Última iteração concluída. Retornados {num_registros_retornados} registros, menos que {qtd_registros}.")
             consolidate_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/consolidate-dados-farm"
-            requests.post(consolidate_url, json={
-                "module": "produto",
-                "output_file": "produto/consolidado/produtos_inicial.parquet"
-            })
+            output_file_path = f"{modulo}/consolidado/{modulo}_inicial.parquet"
+            try:
+                response = requests.post(consolidate_url, json={
+                    "module": modulo,
+                    "output_file": output_file_path
+                })
+                response.raise_for_status()
+                print(f"Consolidação solicitada com sucesso para {output_file_path}")
+            except requests.RequestException as e:
+                print(f"Erro ao chamar consolidação: {str(e)}")
+                return f"Erro na consolidação: {str(e)}", 500
             return f"Iteração {iteracao_str} salva com sucesso! Processamento concluído. Registros: {num_registros_retornados}", 200
 
         primeiro_registro += qtd_registros
