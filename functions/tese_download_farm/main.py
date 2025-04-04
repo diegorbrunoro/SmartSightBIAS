@@ -4,9 +4,17 @@ import requests
 @functions_framework.http
 def tese_download_farm(request):
     print("Iniciando execução da função tese_download_farm.")
+    
+    # Tenta pegar parâmetros do corpo JSON (POST)
     request_json = request.get_json(silent=True)
-    modulo = request_json.get('modulo', 'produto') if request_json else 'produto'
-    primeiro_registro = request_json.get('primeiroRegistro', 0) if request_json else 0
+    if request_json:
+        modulo = request_json.get('modulo', 'produto')
+        primeiro_registro = request_json.get('primeiroRegistro', 0)
+    else:
+        # Se não houver JSON, pega da query string (URL)
+        modulo = request.args.get('modulo', 'produto')
+        primeiro_registro = int(request.args.get('primeiroRegistro', '0'))
+
     print(f"Recebido: modulo={modulo}, primeiro_registro={primeiro_registro}")
 
     # Chama a função download-dados-farm via HTTP
