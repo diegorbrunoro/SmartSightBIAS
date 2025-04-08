@@ -1,6 +1,8 @@
 from google.cloud import bigquery
 import functions_framework
+import os
 
+# Função principal da Cloud Function
 @functions_framework.http
 def verifica_dados_farm(request):
     # Verificar se é uma requisição POST
@@ -52,3 +54,8 @@ def verifica_dados_farm(request):
             "status": "success",
             "message": f"Módulo {modulo} processado (funcionalidade não implementada ainda)"
         }, 200, {"Content-Type": "application/json"}
+
+# Definir a porta explicitamente (necessário para Cloud Run)
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8080))  # Usa a porta 8080 por padrão
+    functions_framework.run_http(verifica_dados_farm, host="0.0.0.0", port=port)
