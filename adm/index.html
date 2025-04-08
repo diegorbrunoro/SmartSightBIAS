@@ -102,7 +102,7 @@
             font-size: 14px;
             text-align: left;
             max-width: 800px;
-            margin-left:A auto;
+            margin-left: auto;
             margin-right: auto;
         }
     </style>
@@ -168,7 +168,7 @@
             titulo.innerText = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
 
             const primeiroRegistro = document.getElementById('primeiroRegistro').value;
-            const url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/tese-download-farm";
+            const url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/verifica-dados-farm";
             const payload = { "modulo": modulo, "primeiroRegistro": parseInt(primeiroRegistro) };
 
             status.innerText = `Carregando ${modulo} a partir do registro ${primeiroRegistro}...`;
