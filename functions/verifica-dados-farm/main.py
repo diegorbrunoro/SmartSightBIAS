@@ -2,7 +2,7 @@ from google.cloud import bigquery
 import functions_framework
 import os
 
-# Função principal da Cloud Function
+# Função principal da Cloud Function (com hífen)
 @functions_framework.http
 def verifica_dados_farm(request):
     # Verificar se é uma requisição POST
