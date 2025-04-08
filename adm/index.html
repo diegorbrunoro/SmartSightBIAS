@@ -95,11 +95,15 @@
         #fornecedores-btn:hover { background-color: #00796B; }
         #estoque-btn { background-color: #3F51B5; }
         #estoque-btn:hover { background-color: #303F9F; }
-        #tese-btn { background-color: #FFC107; } /* Cor para Tese */
-        #tese-btn:hover { background-color: #FFA000; } /* Hover para Tese */
+        #tese-btn { background-color: #FFC107; }
+        #tese-btn:hover { background-color: #FFA000; }
         #status-compras, #status-vendas, #status-produtos, #status-fornecedores, #status-estoque, #status-tese {
             margin-top: 10px;
             font-size: 14px;
+            text-align: left;
+            max-width: 800px;
+            margin-left:A auto;
+            margin-right: auto;
         }
     </style>
 </head>
@@ -144,7 +148,7 @@
         const SENHA_CORRETA = "patrao123";
         let tentativasErradas = 0;
 
-        function dispararFuncao(modulo) {
+        async function dispararFuncao(modulo) {
             const senhaDigitada = prompt(`Digite a senha para disparar ${modulo}:`);
             const status = document.getElementById('status');
             const titulo = document.getElementById('titulo');
@@ -167,23 +171,45 @@
             const url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/tese-download-farm";
             const payload = { "modulo": modulo, "primeiroRegistro": parseInt(primeiroRegistro) };
 
-            status.innerText = `Disparando ${modulo} a partir do registro ${primeiroRegistro}...`;
+            status.innerText = `Carregando ${modulo} a partir do registro ${primeiroRegistro}...`;
             status.className = "success";
 
-            fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-            .then(response => response.text())
-            .then(data => {
-                status.innerText = `${modulo} disparado com sucesso! Resposta: ${data}`;
-                status.className = "success";
-            })
-            .catch(error => {
-                status.innerText = `Erro ao disparar ${modulo}: ${error}`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.status === "success" && modulo === "compras") {
+                    status.innerText = `${modulo} carregado com sucesso!`;
+                    status.className = "success";
+
+                    const comprasStatus = document.getElementById('status-compras');
+                    comprasStatus.innerHTML = "<h3>Últimas Compras:</h3>";
+                    result.data.forEach((row, index) => {
+                        comprasStatus.innerHTML += `
+                            <p>Registro ${index + 1}: 
+                                Data: ${row.dataEntrada}, 
+                                Nota Fiscal: ${row.numeroNotaFiscal}, 
+                                Fornecedor: ${row.codigoFornecedor}, 
+                                Valor Total: ${row.valorTotalNota}, 
+                                Qtd. Itens: ${row.quantidadeItens}
+                            </p>
+                        `;
+                    });
+                } else if (result.status === "success") {
+                    status.innerText = `${modulo} disparado com sucesso! Resposta: ${result.message || 'Dados processados'}`;
+                    status.className = "success";
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                status.innerText = `Erro ao carregar ${modulo}: ${error}`;
                 status.className = "error";
-            });
+            }
         }
 
         function checkStatus(modulo) {
