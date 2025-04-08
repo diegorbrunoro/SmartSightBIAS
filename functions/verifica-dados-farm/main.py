@@ -1,7 +1,7 @@
 from google.cloud import bigquery
 import functions_framework
 
-# Função principal da Cloud Function (com hífen)
+# Função principal da Cloud Function (mapeada para verifica-dados-farm no deploy)
 @functions_framework.http
 def verifica_dados_farm(request):
     # Verificar se é uma requisição POST
