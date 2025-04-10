@@ -27,16 +27,10 @@
         .download-btn:hover {
             background-color: #45a049;
         }
-        #clearStatus {
+        #clearStatus, #resetPrimeiroRegistro {
             background-color: #f44336;
         }
-        #clearStatus:hover {
-            background-color: #da190b;
-        }
-        #resetPrimeiroRegistro {
-            background-color: #f44336;
-        }
-        #resetPrimeiroRegistro:hover {
+        #clearStatus:hover, #resetPrimeiroRegistro:hover {
             background-color: #da190b;
         }
         #status {
@@ -118,25 +112,29 @@
     <script>
         const SENHA_CORRETA = "patrao123";
         let tentativasErradas = 0;
+        let senhaValidada = false;
 
         async function dispararFuncao(modulo) {
-            const senhaDigitada = prompt(`Digite a senha para disparar ${modulo}:`);
             const status = document.getElementById('status');
             const titulo = document.getElementById('titulo');
             const tentativas = document.getElementById('tentativas');
 
-            if (senhaDigitada !== SENHA_CORRETA) {
-                tentativasErradas++;
-                status.innerText = "Senha incorreta! Tente novamente.";
-                status.className = "error";
-                tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
-                return;
+            if (!senhaValidada) {
+                const senhaDigitada = prompt(`Digite a senha para disparar ${modulo}:`);
+                if (senhaDigitada !== SENHA_CORRETA) {
+                    tentativasErradas++;
+                    status.innerText = "Senha incorreta! Tente novamente.";
+                    status.className = "error";
+                    tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
+                    return;
+                } else {
+                    senhaValidada = true;
+                    tentativasErradas = 0;
+                    tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
+                }
             }
 
-            tentativasErradas = 0;
-            tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
             titulo.innerText = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
-
             const primeiroRegistro = document.getElementById('primeiroRegistro').value;
 
             let url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/verifica-dados-farm";
@@ -177,6 +175,7 @@
             status.innerText = "";
             status.className = "";
             tentativasErradas = 0;
+            senhaValidada = false;
             tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
             titulo.innerText = "Portal de Download - Farmácia";
         }
