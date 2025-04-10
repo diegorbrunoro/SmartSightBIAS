@@ -26,10 +26,10 @@ def tese_download_farm(request) -> Tuple[str, int]:
     # Obtém parâmetros
     request_json = request.get_json(silent=True)
     if request_json:
-        modulo = request_json.get('modulo', 'produto')
+        modulo = request_json.get('modulo', 'fornecedor')
         primeiro_registro = request_json.get('primeiroRegistro', 0)
     else:
-        modulo = request.args.get('modulo', 'produto')
+        modulo = request.args.get('modulo', 'fornecedor')
         try:
             primeiro_registro = int(request.args.get('primeiroRegistro', '0'))
         except ValueError:
