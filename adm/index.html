@@ -89,6 +89,10 @@
         #fornecedores-btn:hover { background-color: #00796B; }
         #estoque-btn { background-color: #3F51B5; }
         #estoque-btn:hover { background-color: #303F9F; }
+        #clientes-btn { background-color: #FF9800; }
+        #clientes-btn:hover { background-color: #FB8C00; }
+        #usuarios-btn { background-color: #607D8B; }
+        #usuarios-btn:hover { background-color: #455A64; }
     </style>
 </head>
 <body>
@@ -104,6 +108,8 @@
         <button id="produtos-btn" class="download-btn" onclick="dispararFuncao('produtos')">Baixar Produtos</button>
         <button id="fornecedores-btn" class="download-btn" onclick="dispararFuncao('fornecedores')">Baixar Fornecedores</button>
         <button id="estoque-btn" class="download-btn" onclick="dispararFuncao('estoque')">Baixar Estoque</button>
+        <button id="clientes-btn" class="download-btn" onclick="dispararFuncao('clientes')">Baixar Clientes</button>
+        <button id="usuarios-btn" class="download-btn" onclick="dispararFuncao('usuarios')">Baixar Usuários</button>
     </div>
     <button id="clearStatus" onclick="limparStatus()">Limpar Status</button>
     <div id="status"></div>
@@ -129,7 +135,6 @@
 
             tentativasErradas = 0;
             tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
-
             titulo.innerText = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
 
             const primeiroRegistro = document.getElementById('primeiroRegistro').value;
@@ -177,8 +182,7 @@
         }
 
         function resetPrimeiroRegistro() {
-            const primeiroRegistroInput = document.getElementById('primeiroRegistro');
-            primeiroRegistroInput.value = "0";
+            document.getElementById('primeiroRegistro').value = "0";
         }
     </script>
 </body>
