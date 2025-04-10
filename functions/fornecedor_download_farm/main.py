@@ -4,7 +4,7 @@ import os
 from typing import Dict, Any, Tuple
 
 @functions_framework.http
-def tese_download_farm(request) -> Tuple[str, int]:
+def fornecedor_download_farm(request) -> Tuple[str, int]:
     """
     Função que faz download de dados de farmácia.
     
@@ -17,7 +17,7 @@ def tese_download_farm(request) -> Tuple[str, int]:
     Raises:
         ValueError: Se os parâmetros forem inválidos
     """
-    print("Iniciando execução da função tese_download_farm.")
+    print("Iniciando execução da função fornecedor_download_farm.")
     
     # Configuração via variável de ambiente
     DOWNLOAD_URL = os.getenv('DOWNLOAD_FUNCTION_URL', 
