@@ -27,22 +27,16 @@
         .download-btn:hover {
             background-color: #45a049;
         }
-        .check-status {
-            background-color: #2196F3;
-        }
-        .check-status:hover {
-            background-color: #1976D2;
-        }
-        #check-all-status {
-            background-color: #FF9800;
-        }
-        #check-all-status:hover {
-            background-color: #F57C00;
-        }
-        #clearStatus, #resetPrimeiroRegistro {
+        #clearStatus {
             background-color: #f44336;
         }
-        #clearStatus:hover, #resetPrimeiroRegistro:hover {
+        #clearStatus:hover {
+            background-color: #da190b;
+        }
+        #resetPrimeiroRegistro {
+            background-color: #f44336;
+        }
+        #resetPrimeiroRegistro:hover {
             background-color: #da190b;
         }
         #status {
@@ -68,7 +62,7 @@
             border: 1px solid #ccc;
             border-radius: 5px;
         }
-        h1, h2 {
+        h1 {
             color: #333;
         }
         #tentativas {
@@ -97,14 +91,6 @@
         #estoque-btn:hover { background-color: #303F9F; }
         #tese-btn { background-color: #FFC107; }
         #tese-btn:hover { background-color: #FFA000; }
-        #status-compras, #status-vendas, #status-produtos, #status-fornecedores, #status-estoque, #status-tese {
-            margin-top: 10px;
-            font-size: 14px;
-            text-align: left;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
-        }
     </style>
 </head>
 <body>
@@ -123,25 +109,7 @@
         <button id="tese-btn" class="download-btn" onclick="dispararFuncao('tese')">Baixar Tese</button>
     </div>
     <button id="clearStatus" onclick="limparStatus()">Limpar Status</button>
-    <div>
-        <h2>Verificar Status</h2>
-        <div class="module-buttons">
-            <button class="check-status" onclick="checkStatus('compras')">Status Compras</button>
-            <button class="check-status" onclick="checkStatus('vendas')">Status Vendas</button>
-            <button class="check-status" onclick="checkStatus('produtos')">Status Produtos</button>
-            <button class="check-status" onclick="checkStatus('fornecedores')">Status Fornecedores</button>
-            <button class="check-status" onclick="checkStatus('estoque')">Status Estoque</button>
-            <button class="check-status" onclick="checkStatus('tese')">Status Tese</button>
-        </div>
-        <button id="check-all-status" onclick="checkAllStatus()">Atualizar Todos os Status</button>
-    </div>
     <div id="status"></div>
-    <div id="status-compras"></div>
-    <div id="status-vendas"></div>
-    <div id="status-produtos"></div>
-    <div id="status-fornecedores"></div>
-    <div id="status-estoque"></div>
-    <div id="status-tese"></div>
     <div id="tentativas">Tentativas de senha errada: 0</div>
 
     <script>
@@ -168,7 +136,9 @@
             titulo.innerText = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
 
             const primeiroRegistro = document.getElementById('primeiroRegistro').value;
-            const url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/verifica-dados-farm";
+            const url = modulo === 'tese' 
+                ? "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/tese-download-farm"
+                : "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/verifica-dados-farm";
             const payload = { "modulo": modulo, "primeiroRegistro": parseInt(primeiroRegistro) };
 
             status.innerText = `Carregando ${modulo} a partir do registro ${primeiroRegistro}...`;
@@ -183,24 +153,7 @@
 
                 const result = await response.json();
 
-                if (result.status === "success" && modulo === "compras") {
-                    status.innerText = `${modulo} carregado com sucesso!`;
-                    status.className = "success";
-
-                    const comprasStatus = document.getElementById('status-compras');
-                    comprasStatus.innerHTML = "<h3>Últimas Compras:</h3>";
-                    result.data.forEach((row, index) => {
-                        comprasStatus.innerHTML += `
-                            <p>Registro ${index + 1}: 
-                                Data: ${row.dataEntrada}, 
-                                Nota Fiscal: ${row.numeroNotaFiscal}, 
-                                Fornecedor: ${row.codigoFornecedor}, 
-                                Valor Total: ${row.valorTotalNota}, 
-                                Qtd. Itens: ${row.quantidadeItens}
-                            </p>
-                        `;
-                    });
-                } else if (result.status === "success") {
+                if (result.status === "success") {
                     status.innerText = `${modulo} disparado com sucesso! Resposta: ${result.message || 'Dados processados'}`;
                     status.className = "success";
                 } else {
@@ -212,38 +165,12 @@
             }
         }
 
-        function checkStatus(modulo) {
-            const status = document.getElementById('status');
-            const statusModule = document.getElementById(`status-${modulo}`);
-            status.innerText = "Funcionalidade de status ainda não implementada.";
-            status.className = "error";
-            statusModule.innerText = `${modulo.charAt(0).toUpperCase() + modulo.slice(1)}: Não implementado`;
-            statusModule.className = "error";
-        }
-
-        function checkAllStatus() {
-            const modules = ['compras', 'vendas', 'produtos', 'fornecedores', 'estoque', 'tese'];
-            modules.forEach(module => checkStatus(module));
-        }
-
         function limparStatus() {
             const status = document.getElementById('status');
             const titulo = document.getElementById('titulo');
             const tentativas = document.getElementById('tentativas');
-            const statusCompras = document.getElementById('status-compras');
-            const statusVendas = document.getElementById('status-vendas');
-            const statusProdutos = document.getElementById('status-produtos');
-            const statusFornecedores = document.getElementById('status-fornecedores');
-            const statusEstoque = document.getElementById('status-estoque');
-            const statusTese = document.getElementById('status-tese');
             status.innerText = "";
             status.className = "";
-            statusCompras.innerText = "";
-            statusVendas.innerText = "";
-            statusProdutos.innerText = "";
-            statusFornecedores.innerText = "";
-            statusEstoque.innerText = "";
-            statusTese.innerText = "";
             tentativasErradas = 0;
             tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
             titulo.innerText = "Portal de Download - Farmácia";
