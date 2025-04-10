@@ -89,8 +89,6 @@
         #fornecedores-btn:hover { background-color: #00796B; }
         #estoque-btn { background-color: #3F51B5; }
         #estoque-btn:hover { background-color: #303F9F; }
-        #tese-btn { background-color: #FFC107; }
-        #tese-btn:hover { background-color: #FFA000; }
     </style>
 </head>
 <body>
@@ -106,7 +104,6 @@
         <button id="produtos-btn" class="download-btn" onclick="dispararFuncao('produtos')">Baixar Produtos</button>
         <button id="fornecedores-btn" class="download-btn" onclick="dispararFuncao('fornecedores')">Baixar Fornecedores</button>
         <button id="estoque-btn" class="download-btn" onclick="dispararFuncao('estoque')">Baixar Estoque</button>
-        <button id="tese-btn" class="download-btn" onclick="dispararFuncao('tese')">Baixar Tese</button>
     </div>
     <button id="clearStatus" onclick="limparStatus()">Limpar Status</button>
     <div id="status"></div>
@@ -136,9 +133,12 @@
             titulo.innerText = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
 
             const primeiroRegistro = document.getElementById('primeiroRegistro').value;
-            const url = modulo === 'tese' 
-                ? "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/tese-download-farm"
-                : "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/verifica-dados-farm";
+
+            let url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/verifica-dados-farm";
+            if (modulo === 'fornecedores') {
+                url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/fornecedor-download-farm";
+            }
+
             const payload = { "modulo": modulo, "primeiroRegistro": parseInt(primeiroRegistro) };
 
             status.innerText = `Carregando ${modulo} a partir do registro ${primeiroRegistro}...`;
@@ -166,20 +166,4 @@
         }
 
         function limparStatus() {
-            const status = document.getElementById('status');
-            const titulo = document.getElementById('titulo');
-            const tentativas = document.getElementById('tentativas');
-            status.innerText = "";
-            status.className = "";
-            tentativasErradas = 0;
-            tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
-            titulo.innerText = "Portal de Download - Farmácia";
-        }
-
-        function resetPrimeiroRegistro() {
-            const primeiroRegistroInput = document.getElementById('primeiroRegistro');
-            primeiroRegistroInput.value = "0";
-        }
-    </script>
-</body>
-</html>
+            const status = document.getElementById
