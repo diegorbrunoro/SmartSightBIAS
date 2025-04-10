@@ -8,6 +8,7 @@ import time
 from google.cloud import storage
 from google.cloud import bigquery
 import os
+from flask import jsonify
 
 TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJjb2RfZmlsaWFsIjoiMSIsInNjb3BlIjpbImRyb2dhcmlhIl0sInRva2VuX2ludGVncmFjYW8iOiJ0cnVlIiwiY29kX2Zhcm1hY2lhIjoiMjA4OTAiLCJleHAiOjQwNzA5MTk2MDAsImlhdCI6MTY5MDgyNTk2NiwianRpIjoiOThiZGY0OTUtNDUxNy00NGEzLTg1ODktMzNkYzI3NjJiMmE5IiwiY29kX3VzdWFyaW8iOiI5IiwiYXV0aG9yaXRpZXMiOlsiQVBJX0lOVEVHUkFDQU8iXX0.7CnITyJuUhAZbKO-uothoZkHWidKv9lvtlN_d-ZLJ7k'
 
@@ -51,8 +52,7 @@ def process_page(modulo, primeiro_registro, qtd_registros, storage_client, bucke
 
     try:
         df = pd.DataFrame(data)
-        
-        # Salvar no Cloud Storage
+
         buffer = io.BytesIO()
         table = pa.Table.from_pandas(df, preserve_index=False)
         pq.write_table(table, buffer)
@@ -69,77 +69,81 @@ def process_page(modulo, primeiro_registro, qtd_registros, storage_client, bucke
 @functions_framework.http
 def download_dados_farm(request):
     print("Iniciando execução da função download_dados_farm.")
+
+    # Teste simples para saber se está vivo
+    if request.method == "GET":
+        return "API online. Envie um POST com JSON {'modulo': 'nome_modulo'}", 200
+
     request_json = request.get_json(silent=True)
-    
-    # Verifica se o módulo foi fornecido
-    if request_json and 'modulo' in request_json:
-        modulo = request_json['modulo']
-    else:
-        return "Parâmetro 'modulo' é obrigatório", 400
-        
-    primeiro_registro = request_json.get('primeiroRegistro', 0) if request_json else 0
+
+    if not request_json or 'modulo' not in request_json:
+        return "Parâmetro 'modulo' é obrigatório no corpo da requisição.", 400
+
+    modulo = request_json['modulo']
+    primeiro_registro = request_json.get('primeiroRegistro', 0)
     print(f"Recebido: modulo={modulo}, primeiro_registro={primeiro_registro}")
 
     qtd_registros = 999
     storage_client = storage.Client()
     bucket = storage_client.bucket("farmacia-data-bucket-001")
-    
-    # Lista para armazenar todos os DataFrames
+
     all_dfs = []
     current_registro = primeiro_registro
     has_more_data = True
-    
+
     while has_more_data:
         df, error = process_page(modulo, current_registro, qtd_registros, storage_client, bucket)
-        
+
         if error:
             return error, 500
-            
+
         if df is None or len(df) == 0:
             has_more_data = False
         else:
             all_dfs.append(df)
             current_registro += len(df)
-            
-            # Se recebemos menos registros que o solicitado, é a última página
+
             if len(df) < qtd_registros:
                 has_more_data = False
 
     if not all_dfs:
         return "Nenhum dado processado", 200
 
-    # Consolidar todos os DataFrames
     consolidated_df = pd.concat(all_dfs, ignore_index=True)
-    
-    # Salvar arquivo consolidado
     consolidated_blob_name = f"{modulo}/consolidado/{modulo}_consolidado.parquet"
-    buffer = io.BytesIO()
-    table = pa.Table.from_pandas(consolidated_df, preserve_index=False)
-    pq.write_table(table, buffer)
-    buffer.seek(0)
-    blob = bucket.blob(consolidated_blob_name)
-    blob.upload_from_file(buffer, content_type='application/octet-stream')
-    print(f"Arquivo consolidado salvo: {consolidated_blob_name}")
 
-    # Enviar para o BigQuery
+    try:
+        buffer = io.BytesIO()
+        table = pa.Table.from_pandas(consolidated_df, preserve_index=False)
+        pq.write_table(table, buffer)
+        buffer.seek(0)
+        blob = bucket.blob(consolidated_blob_name)
+        blob.upload_from_file(buffer, content_type='application/octet-stream')
+        print(f"Arquivo consolidado salvo: {consolidated_blob_name}")
+    except Exception as e:
+        return f"Erro ao salvar arquivo consolidado: {str(e)}", 500
+
     try:
         client = bigquery.Client()
         dataset_id = 'farmacia_data'
         table_id = f'{modulo}_raw'
         table_ref = client.dataset(dataset_id).table(table_id)
-        
+
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
             source_format=bigquery.SourceFormat.PARQUET,
         )
-        
+
         job = client.load_table_from_dataframe(
             consolidated_df, table_ref, job_config=job_config
         )
         job.result()
-        
+
         print(f"Dados carregados com sucesso no BigQuery: {dataset_id}.{table_id}")
-        return f"Processamento concluído. Total de registros processados: {len(consolidated_df)}", 200
+        return jsonify({
+            "mensagem": "Processamento concluído",
+            "registros_processados": len(consolidated_df)
+        }), 200
     except Exception as e:
         print(f"Erro ao enviar para BigQuery: {str(e)}")
         return f"Erro ao enviar para BigQuery: {str(e)}", 500
