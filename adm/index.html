@@ -166,4 +166,20 @@
         }
 
         function limparStatus() {
-            const status = document.getElementById
+            const status = document.getElementById('status');
+            const titulo = document.getElementById('titulo');
+            const tentativas = document.getElementById('tentativas');
+            status.innerText = "";
+            status.className = "";
+            tentativasErradas = 0;
+            tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
+            titulo.innerText = "Portal de Download - Farmácia";
+        }
+
+        function resetPrimeiroRegistro() {
+            const primeiroRegistroInput = document.getElementById('primeiroRegistro');
+            primeiroRegistroInput.value = "0";
+        }
+    </script>
+</body>
+</html>
