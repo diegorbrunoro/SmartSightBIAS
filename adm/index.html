@@ -27,6 +27,10 @@
         .download-btn:hover {
             background-color: #45a049;
         }
+        .download-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
         #clearStatus, #resetPrimeiroRegistro {
             background-color: #f44336;
         }
@@ -58,11 +62,6 @@
         }
         h1 {
             color: #333;
-        }
-        #tentativas {
-            color: red;
-            font-size: 14px;
-            margin-top: 10px;
         }
         .module-buttons {
             display: flex;
@@ -107,77 +106,64 @@
     </div>
     <button id="clearStatus" onclick="limparStatus()">Limpar Status</button>
     <div id="status"></div>
-    <div id="tentativas">Tentativas de senha errada: 0</div>
 
     <script>
-        const SENHA_CORRETA = "patrao123";
-        let tentativasErradas = 0;
-        let senhaValidada = false;
-
         async function dispararFuncao(modulo) {
             const status = document.getElementById('status');
             const titulo = document.getElementById('titulo');
-            const tentativas = document.getElementById('tentativas');
+            const buttons = document.querySelectorAll('.download-btn');
 
-            if (!senhaValidada) {
-                const senhaDigitada = prompt(`Digite a senha para disparar ${modulo}:`);
-                if (senhaDigitada !== SENHA_CORRETA) {
-                    tentativasErradas++;
-                    status.innerText = "Senha incorreta! Tente novamente.";
-                    status.className = "error";
-                    tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
-                    return;
-                } else {
-                    senhaValidada = true;
-                    tentativasErradas = 0;
-                    tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
-                }
-            }
+            // Desativar todos os botões de download
+            buttons.forEach(btn => btn.disabled = true);
 
-            titulo.innerText = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
+            // Validar o campo primeiroRegistro
             const primeiroRegistro = document.getElementById('primeiroRegistro').value;
-
-            let url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/verifica-dados-farm";
-            if (modulo === 'fornecedores') {
-                url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/fornecedor-download-farm";
+            if (!primeiroRegistro || isNaN(parseInt(primeiroRegistro))) {
+                status.textContent = "Por favor, insira um número válido para o primeiro registro.";
+                status.className = "error";
+                buttons.forEach(btn => btn.disabled = false);
+                return;
             }
 
-            const payload = { "modulo": modulo, "primeiroRegistro": parseInt(primeiroRegistro) };
-
-            status.innerText = `Carregando ${modulo} a partir do registro ${primeiroRegistro}...`;
-            status.className = "success";
+            // Atualizar título com o nome do módulo
+            titulo.textContent = `Portal de Download - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`;
 
             try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const result = await response.json();
-
-                if (result.status === "success") {
-                    status.innerText = `${modulo} disparado com sucesso! Resposta: ${result.message || 'Dados processados'}`;
-                    status.className = "success";
+                // Formar a URL com base no módulo
+                let url;
+                if (modulo === 'fornecedores') {
+                    // Exceção para fornecedores: usa sublinhado e sem '-dados-'
+                    url = `https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/fornecedor_download_farm?primeiroRegistro=${parseInt(primeiroRegistro)}`;
                 } else {
-                    throw new Error(result.message);
+                    // Outros módulos: usam hífen e '-dados-download-farm'
+                    url = `https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/${modulo}-dados-download-farm?primeiroRegistro=${parseInt(primeiroRegistro)}`;
                 }
+                
+                status.textContent = `Iniciando download de ${modulo} a partir do registro ${primeiroRegistro}...`;
+                status.className = "success";
+
+                // Abrir a URL diretamente para iniciar o download
+                window.open(url, '_blank');
+
+                status.textContent = `Download de ${modulo} iniciado! Verifique seu navegador.`;
+                status.className = "success";
             } catch (error) {
-                status.innerText = `Erro ao carregar ${modulo}: ${error}`;
+                status.textContent = `Erro ao iniciar ${modulo}: ${error.message || 'Falha na requisição'}`;
                 status.className = "error";
+            } finally {
+                // Reativar botões após 10 segundos
+                setTimeout(() => {
+                    buttons.forEach(btn => btn.disabled = false);
+                }, 10000);
             }
         }
 
         function limparStatus() {
             const status = document.getElementById('status');
             const titulo = document.getElementById('titulo');
-            const tentativas = document.getElementById('tentativas');
-            status.innerText = "";
+            status.textContent = "";
             status.className = "";
-            tentativasErradas = 0;
-            senhaValidada = false;
-            tentativas.innerText = `Tentativas de senha errada: ${tentativasErradas}`;
-            titulo.innerText = "Portal de Download - Farmácia";
+            titulo.textContent = "Portal de Download - Farmácia";
         }
 
         function resetPrimeiroRegistro() {
