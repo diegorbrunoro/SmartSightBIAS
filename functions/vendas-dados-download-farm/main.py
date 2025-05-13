@@ -139,3 +139,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Erro ao iniciar o servidor: {str(e)}")
         raise
+
