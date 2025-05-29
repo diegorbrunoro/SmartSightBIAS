@@ -29,23 +29,6 @@ def make_request_with_retries(url, headers, max_retries=5, delay=5, timeout=30):
             time.sleep(delay)
     raise Exception("Todas as tentativas falharam.")
 
-def deve_reprocessar_blob(blob_path, qtd_registros):
-    match = re.search(r'pg_(\d+)_a_(\d+)_r_(\d+)', blob_path)
-    if match:
-        inicio = int(match.group(1))
-        fim = int(match.group(2))
-        registros_salvos = int(match.group(3))
-        registros_no_range = fim - inicio + 1
-        if registros_no_range != registros_salvos or registros_salvos < qtd_registros:
-            print(f"⚠️ Arquivo possivelmente incompleto ({registros_salvos} de {qtd_registros}): {blob_path} — reprocessando")
-            return True
-        else:
-            print(f"✅ Arquivo completo: {blob_path} — pulando")
-            return False
-    else:
-        print(f"⚠️ Nome de arquivo inesperado: {blob_path} — reprocessando por segurança")
-        return True
-
 def carregar_parquets_filial(bucket, prefixo):
     blobs = list(bucket.list_blobs(prefix=prefixo))
     dfs = []
@@ -76,8 +59,6 @@ def download_dados_farm(request):
     primeiro_registro = int(request_json.get('primeiroRegistro', 0))
     qtd_registros = 999
 
-    print(f"🗓 Início do módulo '{modulo}' com {len(filiais)} filiais")
-
     storage_client = storage.Client()
     bucket = storage_client.bucket("farmacia-data-bucket-001")
     bq_client = bigquery.Client()
@@ -102,19 +83,33 @@ def download_dados_farm(request):
             pagina += 1
             iteracao_str = f"{pagina:03d}"
             start_idx = current_registro
-            end_idx = current_registro + qtd_registros - 1
 
-            blob_path_check = f"{modulo}/filial_{cod_filial}/In_{iteracao_str}_{modulo}_pg_{start_idx}_a_{end_idx}_r_{qtd_registros}.parquet"
-            blob_check = bucket.blob(blob_path_check)
+            # Buscar arquivos existentes no intervalo
+            prefixo_filial = f"{modulo}/filial_{cod_filial}/"
+            blobs = list(bucket.list_blobs(prefix=prefixo_filial))
 
-            if blob_check.exists():
-                if not deve_reprocessar_blob(blob_path_check, qtd_registros):
-                    print(f"⏩ Pulando página já processada: {blob_path_check}")
-                    current_registro += qtd_registros
-                    total_registros += qtd_registros
-                    continue
-                else:
-                    print(f"♻️ Reprocessando página incompleta: {blob_path_check}")
+            arquivos_mesmo_intervalo = [
+                blob for blob in blobs if re.search(fr'pg_{start_idx}_a_\d+_r_(\d+)', blob.name)
+            ]
+
+            reprocessar = True
+            for blob in arquivos_mesmo_intervalo:
+                match = re.search(r'r_(\d+)', blob.name)
+                if match:
+                    r = int(match.group(1))
+                    if r >= qtd_registros:
+                        print(f"✅ Arquivo completo encontrado: {blob.name} — pulando")
+                        reprocessar = False
+                        current_registro += r
+                        total_registros += r
+                        break
+                    else:
+                        print(f"♻️ Arquivo incompleto detectado: {blob.name} — será substituído")
+                        blob.delete()
+                        break
+
+            if not reprocessar:
+                continue
 
             url = f"https://api-sgf-gateway.triersistemas.com.br/sgfpod1/rest/integracao/{modulo}/obter-todos-v1?primeiroRegistro={current_registro}&quantidadeRegistros={qtd_registros}"
             headers = {'Authorization': f'Bearer {token}'}
@@ -135,8 +130,9 @@ def download_dados_farm(request):
                 break
 
             dfs.append(df)
-
+            end_idx = start_idx + len(df) - 1
             blob_path = f"{modulo}/filial_{cod_filial}/In_{iteracao_str}_{modulo}_pg_{start_idx}_a_{end_idx}_r_{len(df)}.parquet"
+
             try:
                 buffer = io.BytesIO()
                 table = pa.Table.from_pandas(df, preserve_index=False)
@@ -157,9 +153,8 @@ def download_dados_farm(request):
                 print("📦 Última página detectada.")
                 continuar = False
 
-        prefixo_filial = f"{modulo}/filial_{cod_filial}/"
+        # Consolidar arquivos da filial
         dfs_existentes = carregar_parquets_filial(bucket, prefixo_filial)
-
         if dfs_existentes:
             df_consolidado = pd.concat(dfs_existentes, ignore_index=True)
             consolidated_blob_path = f"{modulo}/consolidado/{modulo}_consolidado_filial{cod_filial}.parquet"
@@ -171,7 +166,7 @@ def download_dados_farm(request):
                 pq.write_table(table, buffer)
                 buffer.seek(0)
                 consolidated_blob.upload_from_file(buffer, content_type='application/octet-stream')
-                print(f"📁 Consolidado salvo (sobrescrito): {consolidated_blob_path}")
+                print(f"📁 Consolidado salvo: {consolidated_blob_path}")
             except Exception as e:
                 print(f"❌ Erro ao salvar consolidado: {e}")
                 continue
