@@ -6,6 +6,7 @@ import pyarrow.parquet as pq
 import io
 import time
 import re
+import random
 from google.cloud import storage, bigquery
 from flask import jsonify
 
@@ -17,22 +18,22 @@ def make_request_with_retries(url, headers, max_retries=5, delay=5, timeout=(10,
 
     for attempt in range(max_retries):
         try:
-            print(f"[{attempt + 1}/{max_retries}] Requisitando: {url}")
+            print(f"[{attempt + 1}/{max_retries}] 🕵️ Requisitando: {url}")
             response = session.get(url, headers=headers, timeout=timeout)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
-            print(f"Erro HTTP ({response.status_code}): {e}")
+            print(f"❌ Erro HTTP ({response.status_code}): {e}")
             if response.status_code == 429 or response.status_code >= 500:
                 wait = 2 ** attempt * delay
-                print(f"Aguardando {wait} segundos antes do retry...")
+                print(f"🕵️‍♂️ Backoff: aguardando {wait} segundos antes de tentar novamente...")
                 time.sleep(wait)
             else:
                 raise
         except Exception as e:
-            print(f"Erro geral: {str(e)}")
+            print(f"❌ Erro geral: {str(e)}")
             wait = 2 ** attempt * delay
-            print(f"Aguardando {wait} segundos antes do retry...")
+            print(f"🕵️‍♂️ Backoff: aguardando {wait} segundos antes de tentar novamente...")
             time.sleep(wait)
     raise Exception("Todas as tentativas falharam.")
 
@@ -84,14 +85,15 @@ def download_dados_farm(request):
         pagina = 0
         arquivos_gerados = []
         dfs = []
+        paginas_falhadas = []
         continuar = True
 
         while continuar:
             pagina += 1
+            inicio_pagina = time.time()
             iteracao_str = f"{pagina:03d}"
             start_idx = current_registro
 
-            # Verifica se já existe arquivo para o mesmo intervalo
             prefixo_filial = f"{modulo}/filial_{cod_filial}/"
             blobs = list(bucket.list_blobs(prefix=prefixo_filial))
 
@@ -125,6 +127,12 @@ def download_dados_farm(request):
                 data = make_request_with_retries(url, headers)
             except Exception as e:
                 print(f"❌ Erro na página {pagina} da filial {cod_filial}: {e} — URL: {url}")
+                paginas_falhadas.append({
+                    "pagina": pagina,
+                    "registro_inicio": current_registro,
+                    "url": url,
+                    "erro": str(e)
+                })
                 break
 
             if not isinstance(data, list) or not data:
@@ -160,10 +168,13 @@ def download_dados_farm(request):
                 print("📦 Última página detectada.")
                 continuar = False
 
-            # Aguarda entre páginas para evitar bloqueios da API
-            time.sleep(1.5)
+            tempo_execucao = time.time() - inicio_pagina
+            print(f"🕵️ Página {pagina} processada em {tempo_execucao:.2f} segundos")
 
-        # Consolidar arquivos da filial
+            sleep = random.uniform(1.2, 3.5)
+            print(f"🕵️ Aguardando {sleep:.2f}s antes da próxima página...")
+            time.sleep(sleep)
+
         dfs_existentes = carregar_parquets_filial(bucket, prefixo_filial)
         if dfs_existentes:
             df_consolidado = pd.concat(dfs_existentes, ignore_index=True)
@@ -199,7 +210,8 @@ def download_dados_farm(request):
         resultados.append({
             "filial": cod_filial,
             "arquivos_individuais": arquivos_gerados,
-            "registros_processados": total_registros
+            "registros_processados": total_registros,
+            "paginas_falhadas": paginas_falhadas
         })
 
     return jsonify({
