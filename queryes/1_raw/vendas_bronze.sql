@@ -21,9 +21,9 @@ SELECT
   item.element.valorTotalLiquido AS valorTotalLiquido
 FROM (
   SELECT *, 'venda_raw_01' AS origem_raw
-  FROM `quick-woodland-453702-g2.farmacia_data.venda_raw_01`
+  FROM `quick-woodland-453702-g2.1_raw.venda_raw_01`
   UNION ALL
   SELECT *, 'venda_raw_02' AS origem_raw
-  FROM `quick-woodland-453702-g2.farmacia_data.venda_raw_02`
+  FROM `quick-woodland-453702-g2.1_raw.venda_raw_02`
 ) AS base,
 UNNEST(base.itens.list) AS item

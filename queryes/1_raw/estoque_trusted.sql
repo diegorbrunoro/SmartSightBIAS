@@ -5,7 +5,7 @@ SELECT
   SAFE_CAST(valorCustoMedio AS FLOAT64) AS valorCustoMedio,
   COALESCE(NULLIF(dataUltimaEntrada, ''), 'Sem informação') AS dataUltimaEntrada,
   SAFE_CAST(valorUltimaEntrada AS FLOAT64) AS valorUltimaEntrada
-FROM `quick-woodland-453702-g2.farmacia_data.estoque_raw_01`
+FROM `quick-woodland-453702-g2.1_raw.estoque_raw_01`
 
 UNION ALL
 
@@ -16,4 +16,4 @@ SELECT
   SAFE_CAST(valorCustoMedio AS FLOAT64) AS valorCustoMedio,
   COALESCE(NULLIF(dataUltimaEntrada, ''), 'Sem informação') AS dataUltimaEntrada,
   SAFE_CAST(valorUltimaEntrada AS FLOAT64) AS valorUltimaEntrada
-FROM `quick-woodland-453702-g2.farmacia_data.estoque_raw_02`
+FROM `quick-woodland-453702-g2.1_raw.estoque_raw_02`
