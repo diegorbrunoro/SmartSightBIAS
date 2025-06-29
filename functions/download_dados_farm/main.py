@@ -180,7 +180,7 @@ def processar_filial(filial, modulo, primeiro_registro, qtd_registros, bucket, b
             print(f"❌ Erro ao salvar consolidado: {e}")
 
         try:
-            table_id = f"{modulo}_raw_{cod_filial}"
+            table_id = f"{modulo}_{cod_filial}"
             table_ref = bq_client.dataset(dataset_id).table(table_id)
             job_config = bigquery.LoadJobConfig(
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
@@ -220,7 +220,7 @@ def download_dados_farm(request):
     storage_client = storage.Client()
     bucket = storage_client.bucket("farmacia-data-bucket-001")
     bq_client = bigquery.Client()
-    dataset_id = "1_raw"
+    dataset_id = "0_landing"
 
     resultados = []
     with ThreadPoolExecutor() as executor:
