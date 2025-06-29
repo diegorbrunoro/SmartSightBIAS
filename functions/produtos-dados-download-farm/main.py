@@ -1,167 +1,67 @@
 import functions_framework
 import requests
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
-import io
-import time
-from google.cloud import storage
-from datetime import datetime, timedelta
-
-# Token hardcoded (considere mover para variável de ambiente ou Secret Manager)
-TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJjb2RfZmlsaWFsIjoiMSIsInNjb3BlIjpbImRyb2dhcmlhIl0sInRva2VuX2ludGVncmFjYW8iOiJ0cnVlIiwiY29kX2Zhcm1hY2lhIjoiMjA4OTAiLCJleHAiOjQwNzA5MTk2MDAsImlhdCI6MTY5MDgyNTk2NiwianRpIjoiOThiZGY0OTUtNDUxNy00NGEzLTg1ODktMzNkYzI3NjJiMmE5IiwiY29kX3VzdWFyaW8iOiI5IiwiYXV0aG9yaXRpZXMiOlsiQVBJX0lOVEVHUkFDQU8iXX0.7CnITyJuUhAZbKO-uothoZkHWidKv9lvtlN_d-ZLJ7k'
-
-def make_request_with_retries(url, headers, max_retries=10, timeout=20, delay=60):
-    for attempt in range(max_retries + 1):
-        try:
-            print(f"Fazendo requisição para URL: {url}")
-            response = requests.get(url, headers=headers, timeout=timeout)
-            response.raise_for_status()
-            print(f"Requisição bem-sucedida. Status: {response.status_code}, Resposta: {response.text[:100]}...")
-            return response
-        except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-            if attempt < max_retries:
-                print(f'Timeout na tentativa {attempt + 1:02d}. Erro: {str(e)}. Tentando novamente em {delay} segundos...')
-                time.sleep(delay)
-            else:
-                print(f'Todas as tentativas ({max_retries}) falharam. Último erro: {str(e)}')
-                raise
+import os
+from typing import Dict, Any, Tuple
 
 @functions_framework.http
-def produtos_dados_download_farm(request):
+def produtos_dados_download_farm(request) -> Tuple[str, int]:
+    """
+    Função que orquestra o download de dados de produtos para múltiplas filiais.
+
+    Args:
+        request: Objeto de requisição HTTP
+
+    Returns:
+        Tuple[str, int]: Resposta e código HTTP
+    """
     print("Iniciando execução da função produtos_dados_download_farm.")
+
+    # URL da função de download real
+    DOWNLOAD_URL = os.getenv('DOWNLOAD_FUNCTION_URL',
+                             "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/download-dados-farm")
+
+    # Obtem parâmetros
     request_json = request.get_json(silent=True)
-    primeiro_registro = request_json.get('primeiroRegistro', 0) if request_json else 0
-    qtd_registros = 999  # Máximo permitido pela API
-    modulo = 'produto'  # Módulo definido uma vez e reutilizado
-    max_paginas = 1000
-    delay_entre_requisicoes = 1
-    max_iteracoes_por_execucao = 15
-
-    print(f"Parâmetros recebidos: primeiro_registro={primeiro_registro}, qtd_registros={qtd_registros}, modulo={modulo}")
-
-    storage_client = storage.Client()
-    bucket = storage_client.bucket("farmacia-data-bucket-001")
-    iteracao_inicial = primeiro_registro // qtd_registros
-
-    while True:
-        iteracao = primeiro_registro // qtd_registros
-        iteracao_str = f"{iteracao:03d}"
-        print(f"Iteração: {iteracao_str}")
-
-        if iteracao >= max_paginas:
-            print(f"Limite máximo de {max_paginas} iterações atingido em {primeiro_registro}.")
-            consolidate_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/consolidate-dados-farm"
-            output_file_path = f"{modulo}/consolidado/{modulo}_inicial.parquet"
-            try:
-                response = requests.post(consolidate_url, json={
-                    "module": modulo,
-                    "output_file": output_file_path
-                })
-                response.raise_for_status()
-                print(f"Consolidação solicitada com sucesso para {output_file_path}")
-            except requests.RequestException as e:
-                print(f"Erro ao chamar consolidação: {str(e)}")
-                return f"Erro na consolidação: {str(e)}", 500
-            return f"Limite máximo de {max_paginas} iterações atingido.", 200
-
-        if (iteracao - iteracao_inicial) >= max_iteracoes_por_execucao:
-            print(f"Limite de {max_iteracoes_por_execucao} iterações por execução atingido. Reiniciando a partir de primeiro_registro={primeiro_registro}.")
-            reinvoke_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/produtos-dados-download-farm"
-            try:
-                response = requests.post(reinvoke_url, json={"primeiroRegistro": primeiro_registro})
-                response.raise_for_status()
-                print(f"Reinvocação bem-sucedida para primeiro_registro={primeiro_registro}")
-            except requests.RequestException as e:
-                print(f"Erro ao reinvocar a função: {str(e)}")
-                return f"Erro ao reinvocar: {str(e)}", 500
-            return f"Processamento pausado após {max_iteracoes_por_execucao} iterações. Reiniciando a partir de {primeiro_registro}.", 200
-
-        blob_name = f"{modulo}/In_{iteracao_str}_{modulo}_pg_{primeiro_registro}_a_{primeiro_registro + qtd_registros - 1}.parquet"
-        blob = bucket.blob(blob_name)
-        if blob.exists():
-            print(f"Arquivo {blob_name} já existe, pulando iteração {iteracao_str}.")
-            primeiro_registro += qtd_registros
-            continue
-
-        url = f'https://api-sgf-gateway.triersistemas.com.br/sgfpod1/rest/integracao/{modulo}/obter-todos-v1?primeiroRegistro={primeiro_registro}&quantidadeRegistros={qtd_registros}'
-        headers = {'Authorization': f'Bearer {TOKEN}'}
-
+    if request_json:
+        modulo = request_json.get('modulo', 'produto')
+        primeiro_registro = request_json.get('primeiroRegistro', 0)
+    else:
+        modulo = request.args.get('modulo', 'produto')
         try:
-            response = make_request_with_retries(url, headers)
-            data = response.json()
-            print(f"Dados recebidos da API: {len(data)} registros.")
-        except Exception as e:
-            print(f"Erro ao buscar dados da API: {str(e)}")
-            return f"Erro ao buscar dados: {str(e)}", 500
+            primeiro_registro = int(request.args.get('primeiroRegistro', '0'))
+        except ValueError:
+            return "primeiroRegistro deve ser um número inteiro", 400
 
-        if not data:
-            print(f"Nenhum dado retornado para iteração {iteracao_str} (página {primeiro_registro}). Processamento concluído.")
-            consolidate_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/consolidate-dados-farm"
-            output_file_path = f"{modulo}/consolidado/{modulo}_inicial.parquet"
-            try:
-                response = requests.post(consolidate_url, json={
-                    "module": modulo,
-                    "output_file": output_file_path
-                })
-                response.raise_for_status()
-                print(f"Consolidação solicitada com sucesso para {output_file_path}")
-            except requests.RequestException as e:
-                print(f"Erro ao chamar consolidação: {str(e)}")
-                return f"Erro na consolidação: {str(e)}", 500
-            return "Nenhum dado retornado. Processamento concluído.", 200
+    if primeiro_registro < 0:
+        return "primeiroRegistro não pode ser negativo", 400
 
-        num_registros_retornados = len(data)
-        if num_registros_retornados != 999:
-            print(f"Aviso: Número de registros retornados na iteração {iteracao_str} é diferente de 999. Foram retornados {num_registros_retornados} registros.")
+    print(f"Recebido: modulo={modulo}, primeiro_registro={primeiro_registro}")
 
-        ultimo_registro = primeiro_registro + num_registros_retornados - 1
-        blob_name = f"{modulo}/In_{iteracao_str}_{modulo}_pg_{primeiro_registro}_a_{ultimo_registro}.parquet"
+    # Lista de filiais e tokens (pode ser migrado para Secret Manager ou env vars futuramente)
+    filiais = [
+        {
+            "filial": "01",
+            "token": "eyJhbGciOiJIUzI1NiJ9.eyJjb2RfZmlsaWFsIjoiMSIsInNjb3BlIjpbImRyb2dhcmlhIl0sInRva2VuX2ludGVncmFjYW8iOiJ0cnVlIiwiY29kX2Zhcm1hY2lhIjoiMjA4OTAiLCJleHAiOjQwNzA5MTk2MDAsImlhdCI6MTY5MDgyNTk2NiwianRpIjoiOThiZGY0OTUtNDUxNy00NGEzLTg1ODktMzNkYzI3NjJiMmE5IiwiY29kX3VzdWFyaW8iOiI5IiwiYXV0aG9yaXRpZXMiOlsiQVBJX0lOVEVHUkFDQU8iXX0.7CnITyJuUhAZbKO-uothoZkHWidKv9lvtlN_d-ZLJ7k"
+        },
+        {
+            "filial": "02",
+            "token": "eyJhbGciOiJIUzI1NiJ9.eyJjb2RfZmlsaWFsIjoiMiIsInNjb3BlIjpbImRyb2dhcmlhIl0sInRva2VuX2ludGVncmFjYW8iOiJ0cnVlIiwiY29kX2Zhcm1hY2lhIjoiMjgyMDQiLCJleHAiOjQxMDI0NTU2MDAsImlhdCI6MTc0NTk1NDU1OSwianRpIjoiMDI4NzU1NmQtMjBlMC00Y2RiLWEyYTUtNWI5OTYwMDUxMzZjIiwiY29kX3VzdWFyaW8iOiIxNCIsImF1dGhvcml0aWVzIjpbIkFQSV9JTlRFR1JBQ0FPIl19.EyKhGJBgaAw3UoRFnHT1a2JlZ2U7BvqgsdG0WnLh1s4"
+        }
+    ]
 
-        try:
-            # Converter JSON pra Parquet
-            df = pd.DataFrame(data)
-            buffer = io.BytesIO()
-            table = pa.Table.from_pandas(df, preserve_index=False)
-            pq.write_table(table, buffer)
-            buffer.seek(0)
-            blob = bucket.blob(blob_name)
-            blob.upload_from_file(buffer, content_type='application/octet-stream')
-            print(f"Página processada: {blob_name}, Registros: {num_registros_retornados:03d}")
-        except Exception as e:
-            print(f"Erro ao salvar no bucket: {str(e)}")
-            return f"Erro ao salvar no bucket: {str(e)}", 500
+    # Payload com múltiplas filiais
+    payload = {
+        "modulo": modulo,
+        "primeiroRegistro": primeiro_registro,
+        "filiais": filiais
+    }
 
-        if num_registros_retornados < qtd_registros:
-            print(f"Última iteração concluída. Retornados {num_registros_retornados} registros, menos que {qtd_registros}.")
-            consolidate_url = "https://southamerica-east1-quick-woodland-453702-g2.cloudfunctions.net/consolidate-dados-farm"
-            output_file_path = f"{modulo}/consolidado/{modulo}_inicial.parquet"
-            try:
-                response = requests.post(consolidate_url, json={
-                    "module": modulo,
-                    "output_file": output_file_path
-                })
-                response.raise_for_status()
-                print(f"Consolidação solicitada com sucesso para {output_file_path}")
-            except requests.RequestException as e:
-                print(f"Erro ao chamar consolidação: {str(e)}")
-                return f"Erro na consolidação: {str(e)}", 500
-            return f"Iteração {iteracao_str} salva com sucesso! Processamento concluído. Registros: {num_registros_retornados}", 200
-
-        primeiro_registro += qtd_registros
-        print(f"Preparando próxima iteração a partir de primeiro_registro={primeiro_registro}")
-        print(f"Aguardando {delay_entre_requisicoes} segundos antes da próxima requisição...")
-        time.sleep(delay_entre_requisicoes)
-
-    return "Processamento concluído de forma inesperada.", 200
-
-if __name__ == "__main__":
-    import os
-    port = int(os.getenv("PORT", 8080))
-    print(f"Iniciando o servidor na porta: {port}")
     try:
-        functions_framework.run_http(produtos_dados_download_farm, host="0.0.0.0", port=port)
-        print("Servidor iniciado com sucesso!")
-    except Exception as e:
-        print(f"Erro ao iniciar o servidor: {str(e)}")
-        raise
+        response = requests.post(DOWNLOAD_URL, json=payload, timeout=60)
+        response.raise_for_status()
+        return response.text, 200
+    except requests.Timeout:
+        return "Timeout ao chamar download-dados-farm", 504
+    except requests.RequestException as e:
+        print(f"Erro ao chamar download-dados-farm: {str(e)}")
+        return f"Erro ao chamar download-dados-farm: {str(e)}", 500
