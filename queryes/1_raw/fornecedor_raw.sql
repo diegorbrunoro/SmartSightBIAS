@@ -7,7 +7,7 @@ SELECT
   COALESCE(NULLIF(nomeCidade, ''), 'Sem informação') AS nomeCidade,
   COALESCE(NULLIF(email, ''), 'Sem informação') AS email,
   SAFE_CAST(ativo AS BOOL) AS ativo
-FROM `quick-woodland-453702-g2.1_raw.fornecedor_raw_01`
+FROM `quick-woodland-453702-g2.0_landing.fornecedor_01`
 
 UNION ALL
 
@@ -20,4 +20,4 @@ SELECT
   COALESCE(NULLIF(nomeCidade, ''), 'Sem informação') AS nomeCidade,
   COALESCE(NULLIF(email, ''), 'Sem informação') AS email,
   SAFE_CAST(ativo AS BOOL) AS ativo
-FROM `quick-woodland-453702-g2.1_raw.fornecedor_raw_02`
+FROM `quick-woodland-453702-g2.1_raw.fornecedor_02`

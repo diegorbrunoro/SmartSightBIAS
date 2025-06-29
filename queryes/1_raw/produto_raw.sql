@@ -39,7 +39,7 @@ WITH base_unida AS (
       FROM UNNEST(tags.list) AS t
     ) AS tags_array,
     'produto_raw_01' AS origem_raw
-  FROM `quick-woodland-453702-g2.1_raw.produto_raw_01`
+  FROM `quick-woodland-453702-g2.0_landing.produto_01`
 
   UNION ALL
 
@@ -83,7 +83,7 @@ WITH base_unida AS (
       FROM UNNEST(tags.list) AS t
     ) AS tags_array,
     'produto_raw_02' AS origem_raw
-  FROM `quick-woodland-453702-g2.1_raw.produto_raw_02`
+  FROM `quick-woodland-453702-g2.0_landing.produto_02`
 )
 
 SELECT

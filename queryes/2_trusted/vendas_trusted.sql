@@ -1,0 +1,21 @@
+SELECT
+  origem_raw,
+  chave_composta,
+  numeroNota,
+  DATE(dataEmissao) AS dataEmissao,
+  horaEmissao,
+  codigoVendedor,
+  IFNULL(CAST(codigoCliente AS STRING), 'Sem informação') AS codigoCliente,
+  entrega,
+  condicaoPagamento_codigo,
+  condicaoPagamento_nome,
+  IFNULL(CAST(numeroNotaFiscal AS STRING), 'Sem informação') AS numeroNotaFiscal,
+  codFilial,
+  codigoProduto,
+  item_codigoVendedor,
+  item_parceiro,
+  quantidadeProdutos,
+  valorTotalBruto,
+  valorTotalCusto,
+  valorTotalLiquido
+FROM `quick-woodland-453702-g2.1_raw.vendas_raw`

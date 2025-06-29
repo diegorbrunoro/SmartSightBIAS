@@ -24,9 +24,9 @@ SELECT
 
 FROM (
   SELECT *, 'compra_raw_01' AS origem_raw
-  FROM `quick-woodland-453702-g2.1_raw.compra_raw_01`
+  FROM `quick-woodland-453702-g2.0_landing.compra_01`
   UNION ALL
   SELECT *, 'compra_raw_02' AS origem_raw
-  FROM `quick-woodland-453702-g2.1_raw.compra_raw_02`
+  FROM `quick-woodland-453702-g2.0_landing.compra_02`
 ) AS base,
 UNNEST(base.itens.list) AS item
