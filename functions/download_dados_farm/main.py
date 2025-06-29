@@ -220,7 +220,7 @@ def download_dados_farm(request):
     storage_client = storage.Client()
     bucket = storage_client.bucket("farmacia-data-bucket-001")
     bq_client = bigquery.Client()
-    dataset_id = "farmacia_data"
+    dataset_id = "1_raw"
 
     resultados = []
     with ThreadPoolExecutor() as executor:
