@@ -92,7 +92,6 @@ def processar_filial(filial, modulo, primeiro_registro, qtd_registros, bucket, b
     total_registros = 0
     pagina = 0
     arquivos_gerados = []
-    dfs = []
     paginas_falhadas = []
     continuar = True
 
@@ -137,7 +136,6 @@ def processar_filial(filial, modulo, primeiro_registro, qtd_registros, bucket, b
             print(f"⚠️ DataFrame vazio na página {pagina} da filial {cod_filial}")
             break
 
-        dfs.append(df)
         end_idx = start_idx + len(df) - 1
         blob_path = f"{modulo}/filial_{cod_filial}/In_{iteracao_str}_{modulo}_pg_{start_idx}_a_{end_idx}_r_{len(df)}.parquet"
 
@@ -155,10 +153,17 @@ def processar_filial(filial, modulo, primeiro_registro, qtd_registros, bucket, b
             print(f"❌ Erro ao salvar blob: {e}")
             break
 
-        current_registro += len(df)
-        total_registros += len(df)
+        # Liberar memória imediatamente após salvar
+        del df
+        del table
+        del buffer
+        import gc
+        gc.collect()
 
-        if len(df) < qtd_registros:
+        current_registro += len(data)
+        total_registros += len(data)
+
+        if len(data) < qtd_registros:
             print("📦 Última página detectada.")
             continuar = False
 
@@ -168,36 +173,95 @@ def processar_filial(filial, modulo, primeiro_registro, qtd_registros, bucket, b
         print(f"🕵️ Aguardando {sleep:.2f}s antes da próxima página...")
         time.sleep(sleep)
 
-    dfs_existentes = carregar_parquets_filial(bucket, prefixo_filial)
-    if dfs_existentes:
-        df_consolidado = pd.concat(dfs_existentes, ignore_index=True)
-        consolidated_blob_path = f"{modulo}/consolidado/{modulo}_consolidado_filial{cod_filial}.parquet"
-        consolidated_blob = bucket.blob(consolidated_blob_path)
-
-        try:
+    # Consolidar dados usando streaming para economizar memória
+    print(f"🔄 Consolidando dados da filial {cod_filial}...")
+    try:
+        # Carregar e consolidar em lotes para economizar memória
+        blobs_parquet = [blob for blob in bucket.list_blobs(prefix=prefixo_filial) if blob.name.endswith('.parquet')]
+        
+        if blobs_parquet:
+            # Usar PyArrow para consolidar sem carregar tudo na memória
+            tables = []
+            for i, blob in enumerate(blobs_parquet):
+                buffer = io.BytesIO()
+                blob.download_to_file(buffer)
+                buffer.seek(0)
+                table = pq.read_table(buffer)
+                
+                # Converter para pandas para normalizar tipos
+                df = table.to_pandas()
+                
+                # Adicionar coluna com nome do arquivo de origem
+                df['arquivo_origem'] = blob.name
+                
+                # Normalizar tipos problemáticos
+                if 'numeroNotaFiscal' in df.columns:
+                    # Converter para string para evitar conflitos de tipo
+                    df['numeroNotaFiscal'] = df['numeroNotaFiscal'].astype(str)
+                
+                if 'codigoCliente' in df.columns:
+                    # Converter para string para evitar conflitos de tipo
+                    df['codigoCliente'] = df['codigoCliente'].astype(str)
+                
+                # Converter de volta para PyArrow
+                table = pa.Table.from_pandas(df, preserve_index=False)
+                tables.append(table)
+                
+                # Liberar memória
+                buffer.close()
+                del buffer
+                del df
+                gc.collect()
+            
+            # Concatenar tabelas PyArrow (mais eficiente que pandas)
+            consolidated_table = pa.concat_tables(tables)
+            
+            # Consolidar usando streaming
+            consolidated_blob_path = f"{modulo}/consolidado/{modulo}_consolidado_filial{cod_filial}.parquet"
+            consolidated_blob = bucket.blob(consolidated_blob_path)
+            
+            # Salvar consolidado
             buffer = io.BytesIO()
-            table = pa.Table.from_pandas(df_consolidado, preserve_index=False)
-            pq.write_table(table, buffer)
+            pq.write_table(consolidated_table, buffer)
             buffer.seek(0)
             consolidated_blob.upload_from_file(buffer, content_type='application/octet-stream')
             print(f"📁 Consolidado salvo: {consolidated_blob_path}")
-        except Exception as e:
-            print(f"❌ Erro ao salvar consolidado: {e}")
-       
-        try:
-            table_id = f"{modulo}_{cod_filial}" # Aqui adiciono o nome que vai aparecer no arquivo que vai ser carregado no bigquery no 0_landing Exemplo: compra_01 e etc
-            table_ref = bq_client.dataset(dataset_id).table(table_id)
-            job_config = bigquery.LoadJobConfig(
-                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-                source_format=bigquery.SourceFormat.PARQUET,
-                autodetect=True,
-            )
-            buffer.seek(0)
-            job = bq_client.load_table_from_file(buffer, table_ref, job_config=job_config)
-            job.result()
-            print(f"🚀 Dados enviados ao BigQuery: {dataset_id}.{table_id}")
-        except Exception as e:
-            print(f"❌ Erro ao enviar para BigQuery: {e}")
+            
+            # Liberar memória
+            del tables
+            del consolidated_table
+            buffer.close()
+            del buffer
+            gc.collect()
+            
+            # Carregar para BigQuery
+            try:
+                table_id = f"{modulo}_{cod_filial}" # Aqui adiciono o nome que vai aparecer no arquivo que vai ser carregado no bigquery no 0_landing Exemplo: compra_01 e etc
+                table_ref = bq_client.dataset(dataset_id).table(table_id)
+                job_config = bigquery.LoadJobConfig(
+                    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                    source_format=bigquery.SourceFormat.PARQUET,
+                    autodetect=True,
+                )
+                
+                # Recarregar buffer para BigQuery
+                buffer = io.BytesIO()
+                consolidated_blob.download_to_file(buffer)
+                buffer.seek(0)
+                job = bq_client.load_table_from_file(buffer, table_ref, job_config=job_config)
+                job.result()
+                print(f"🚀 Dados enviados ao BigQuery: {dataset_id}.{table_id}")
+                buffer.close()
+                del buffer
+                gc.collect()
+                
+            except Exception as e:
+                print(f"❌ Erro ao enviar para BigQuery: {e}")
+                
+    except Exception as e:
+        print(f"❌ Erro ao consolidar dados: {e}")
+        import traceback
+        print(f"Detalhes do erro: {traceback.format_exc()}")
 
     return {
         "filial": cod_filial,
@@ -215,7 +279,7 @@ def download_dados_farm(request):
         "bucket_name": "smartsight-biaas-data",  # Bucket para armazenar arquivos
         "project_id": "smartsight-biaas",        # Projeto BigQuery
         "dataset_id": "0_landing",               # Dataset BigQuery
-        "max_pages_per_filial": 2,               # Limite de páginas para teste (None = sem limite)
+        "max_pages_per_filial": None,            # Limite de páginas para teste (None = sem limite) ou 2 para teste
         "records_per_page": 999                  # Registros por página
     }
 
